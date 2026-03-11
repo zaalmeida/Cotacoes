@@ -1,0 +1,74 @@
+
+// /.netlify/functions/metalsLatest
+// Usa Metals API (metalsapi.com/metalsapi.org) para histórico e calcular variações
+// Requer METALS_API_KEY
+
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
+exports.handler = async (event) => {
+  try{
+    const key = process.env.METALS_API_KEY;
+    if(!key) return { statusCode:500, body: JSON.stringify({error:'Missing METALS_API_KEY'}) };
+    const code = (event.queryStringParameters && event.queryStringParameters.code) || 'XAU';
+    const end = new Date(); const start = new Date(Date.now()-400*24*3600*1000);
+    // Algumas instâncias usam metalsapi.org, outras metals-api.com; ajuste conforme sua conta
+    const url = `https://metals-api.com/api/timeseries?access_key=${key}&start_date=${start.toISOString().slice(0,10)}&end_date=${end.toISOString().slice(0,10)}&base=USD&symbols=${encodeURIComponent(code)}`;
+    const res = await fetch(url); const data = await res.json();
+    const rates = data.rates || {}; const dates = Object.keys(rates).sort();
+    if (!dates.length) throw new Error('No metals data');
+    const lastDate = dates[dates.length-1];
+    const last = rates[lastDate][code];
+    function findPast(days){
+      const target = new Date(Date.now()-days*24*3600*1000).toISOString().slice(0,10);
+      // escolher data mais próxima >= target
+      let idx = dates.findIndex(d=>d>=target); if (idx<0) idx=dates.length-1; return rates[dates[idx]][code];
+    }
+    const changes = {
+      d1: ((last - findPast(1))/findPast(1))*100,
+      d7: ((last - findPast(7))/findPast(7))*100,
+      d30: ((last - findPast(30))/findPast(30))*100,
+      d365: ((last - findPast(365))/findPast(365))*100
+    };
+    return { statusCode:200, body: JSON.stringify({ code, price:last, changes }) };
+  }catch(e){ return { statusCode:500, body: JSON.stringify({error:e.message}) } }
+};
+
+
+// /.netlify/functions/oilLatest
+// Usa OilPriceAPI para obter histórico e calcular variações
+// Requer OILPRICEAPI_TOKEN
+
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
+exports.handler = async (event) => {
+  try{
+    const token = process.env.OILPRICEAPI_TOKEN;
+    if(!token) return { statusCode:500, body: JSON.stringify({error:'Missing OILPRICEAPI_TOKEN'}) };
+    const code = (event.queryStringParameters && event.queryStringParameters.code) || 'BRENT_CRUDE_USD';
+    const end = new Date(); const start = new Date(Date.now()-400*24*3600*1000);
+    const url = `https://api.oilpriceapi.com/v1/prices/historical?code=${encodeURIComponent(code)}&start=${start.toISOString().slice(0,10)}&end=${end.toISOString().slice(0,10)}&interval=daily`;
+    const res = await fetch(url, { headers: { 'Authorization': `Token ${token}` } });
+    const data = await res.json();
+    const series = (data.data && data.data.prices) || (data.data) || [];
+    // series esperado: [{timestamp:"2025-12-29T..", price: 74.5}, ...]
+    if (!series.length) throw new Error('No oil data');
+    series.sort((a,b)=> new Date(a.timestamp)-new Date(b.timestamp));
+    const last = series[series.length-1].price;
+    function findPast(days){
+      const target = new Date(Date.now()-days*24*3600*1000);
+      // mais próximo
+      let best = series[0]; let bestDiff = Math.abs(new Date(series[0].timestamp)-target);
+      for(const p of series){ const diff = Math.abs(new Date(p.timestamp)-target); if (diff<bestDiff){ best=p; bestDiff=diff; } }
+      return best.price;
+    }
+    const changes = {
+      d1: ((last - findPast(1))/findPast(1))*100,
+      d7: ((last - findPast(7))/findPast(7))*100,
+      d30: ((last - findPast(30))/findPast(30))*100,
+      d365: ((last - findPast(365))/findPast(365))*100
+    };
+    return { statusCode:200, body: JSON.stringify({ code, price:last, changes }) };
+  }catch(e){
+    return { statusCode:500, body: JSON.stringify({error:e.message}) };
+  }
+};
