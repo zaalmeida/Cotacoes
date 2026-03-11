@@ -1,0 +1,31 @@
+
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mercados Hoje</title>
+  <link rel="stylesheet" href="./assets/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Mercados Hoje</h1>
+    <div id="last-updated" class="muted"></div>
+  </header>
+
+  <main class="grid" id="cards">
+    <!-- Cards renderizados via JS -->
+  </main>
+
+  <footer>
+    <small>
+      Este website é informativo e pode usar dados com atraso. Respeite os limites das APIs e utilize cache local.<br>
+      Fontes: exchangerate.host (forex), CoinGecko (cripto), Metals API (metais), OilPriceAPI (petróleo), Alpha Vantage (ações/índices).
+    </small>
+  </footer>
+
+  <script src="./assets/utils.js"></script>
+  <script src="./assets/config.example.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>
